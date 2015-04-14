@@ -61,10 +61,13 @@
 (define-syntax-rule (define-sprite sd n row ...)
   (add-sprite!/rows sd n '(row ...)))
 
+;; xxx show animations
+
 (define current-sd (make-parameter #f))
 (define current-W (make-parameter #f))
 (define current-H (make-parameter #f))
 
+;; xxx show the sprite with different sizes and palette options
 (define (spr->make-st spr pal)
   (λ (csd W H)
     (define W.0 (fx->fl W))
@@ -111,18 +114,37 @@
            lux/chaos/gui
            lux/chaos/gui/key)
 
-  (struct *apse (f output)
+  (struct *apse (f fe output)
     #:methods gen:word
     ;; xxx add a word-evt for this, studio, puresuri, etc
     [(define (word-fps w)
        0.0)
      (define (word-label s ft)
        (lux-standard-label "APSE" ft))
+     (define (word-evt w)
+       (*apse-fe w))
      (define (word-output w)
        (*apse-output w))
      (define (word-event w e)
-       (define closed? #f)
        (cond
+         [(eq? e 'file-changed)
+          (define f (*apse-f w))
+          (define output
+            (let ()
+              (match-define (-apse sd W H make-st) (load-visuals f))
+              (define csd (compile-sprite-db sd))
+              (save-csd! csd "csd")
+              (define st (make-st csd W H))
+              (define render (stage-draw/dc csd W H))
+              (render (vector (layer (fx->fl (/ W 2)) (fx->fl (/ H 2)))
+                              #f #f #f #f #f #f #f)
+                      st
+                      '())))
+          (define new-fe
+            (wrap-fe (filesystem-change-evt f)))
+          (struct-copy *apse w
+                       [fe new-fe]
+                       [output output])]
          [(or (eq? e 'close)
               (and (key-event? e)
                    (eq? 'escape (key-event-code e))))
@@ -131,6 +153,9 @@
           w]))
      (define (word-tick w)
        w)])
+
+  (define (wrap-fe e)
+    (wrap-evt e (λ _ 'file-changed)))
 
   (define (load-visuals mp)
     (define ns (make-base-namespace))
@@ -142,22 +167,10 @@
       (namespace-variable-value 'apse)))
 
   (define (apse! f)
-    (define output
-      (let ()
-        (match-define (-apse sd W H make-st) (load-visuals f))
-        (define csd (compile-sprite-db sd))
-        (save-csd! csd "csd")
-        (define st (make-st csd W H))
-        (define render (stage-draw/dc csd W H))
-        (render (vector (layer (fx->fl (/ W 2)) (fx->fl (/ H 2)))
-                        #f #f #f #f #f #f #f)
-                st
-                '())))
-    (define obj (*apse f output))
+    (define obj (*apse f (wrap-fe always-evt) void))
     (call-with-chaos
      (make-gui #:mode gui-mode)
-     (λ ()
-       (fiat-lux obj))))
+     (λ () (fiat-lux obj))))
 
   (provide
    (contract-out
@@ -173,4 +186,3 @@
    #:program "apse"
    #:args (file)
    (apse! file)))
-
