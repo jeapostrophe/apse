@@ -74,6 +74,8 @@
 (module+ main
   (require racket/cmdline)
 
+  ;; (gl-screenshot-dir (build-path (current-directory) "shots"))
+
   (command-line
    #:program "apse"
    #:args (file)
