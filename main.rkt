@@ -32,9 +32,6 @@
           (list Hi1 Hi2 Hi3 Hi4)
           (list WHITE)))
 
-(define (add-apse-palette! sd)
-  (add-palette! sd 'pal:apse APSE-PALETTE))
-
 (define CHAR->COLOR
   (hasheq #\_ _TRANS
           #\$ _BLACK
@@ -48,11 +45,16 @@
   (for/list ([c (in-string (symbol->string qr))])
     (hash-ref CHAR->COLOR c)))
 
-(define (add-sprite!/rows sd n qrows)
+(define (add-sprite!/rows sd n qrows
+                          #:w w #:h h)
   (define rows (map qrow->row qrows))
-  ;; xxx check rows all same width
-  (define w (length (first rows)))
-  (define h (length rows))
+  (unless (= h (length rows))
+    (error 'add-sprite!/rows "height is wrong ~v" (length rows)))
+  (for ([r (in-list rows)]
+        [i (in-naturals)])
+    (define l (length r))
+    (unless (= w l)
+      (error 'add-sprite!/rows "row ~v is wrong length ~v" i l)))
   (define pal 'pal:apse)
   (define bs (make-bytes (* 4 w h)))
   (for ([y (in-naturals)]
@@ -65,12 +67,32 @@
    (λ ()
      (vector n pal w h bs))))
 
-;; xxx specify size
 ;; xxx allow shading vs diffuse separation
-(define-syntax-rule (define-sprite sd n row ...)
+(define-syntax-rule (define-sprite sd n #:w w #:h h row ...)
   (begin
     (define n 'n)
-    (add-sprite!/rows sd n '(row ...))))
+    (add-sprite!/rows sd n '(row ...)
+                      #:w w #:h h)))
+
+(define (initialize-apse! sd)
+  (define-sprite sd spr:point #:w 1 #:h 1 $)
+  (add-palette! sd 'pal:apse APSE-PALETTE))
+
+(define (checkerboard csd W.0 H.0)
+  (define S 8.0)
+  (define sp (sprite-idx csd 'spr:point))
+  (for*/list ([c (in-range (ceiling (/ W.0 S)))]
+              [r (in-range (ceiling (/ H.0 S)))])
+    (define cx (fl+ (fl* S (fx->fl c)) (fl/ S 2.0)))
+    (define cy (fl+ (fl* S (fx->fl r)) (fl/ S 2.0)))
+    (define ?
+      (or (and (even? c) (odd? r))
+          (and (odd? c) (even? r))))
+    (if ?
+        (sprite cx cy sp #:mx S #:my S
+                #:r 226 #:g 226 #:b 226)
+        (sprite cx cy sp #:mx S #:my S
+                #:r 255 #:g 255 #:b 255))))
 
 ;; xxx show animations
 
@@ -89,21 +111,32 @@
     (define h (sprite-height csd si))
     (define pi (palette-idx csd pal))
 
+    (define-values (left max-i)
+      (let loop ([left W.0] [i 1])
+        (define iw (fl+ 1.0 (fl* w (fx->fl i))))
+        (cond
+          [(fl< iw left)
+           (loop (fl- left iw) (fx+ 1 i))]
+          [else
+           (values left i)])))
+    (define initial-lx (fl/ left 2.0))
+
     (define-values (_ st)
-      (for/fold ([lx 0.0] [st #f])
-                ;; xxx compute how many will fit
-                ([i (in-range 1 6)])
+      (for/fold ([lx initial-lx] [st #f])
+                ([i (in-range 1 max-i)])
         (define m (fx->fl i))
         (define mw (fl* m w))
         (define cx (fl+ lx (fl/ mw 2.0)))
-        (values (fl+ cx (fl/ mw 2.0))
+        (values (fl+ 1.0 (fl+ cx (fl/ mw 2.0)))
                 (cons (sprite cx cy si
                               #:mx m #:my m
                               #:pal-idx pi)
                       st))))
 
-    st))
+    (define cb (checkerboard csd W.0 H.0))
+    (cons cb st)))
 
+;; xxx help make borderless tiles
 (define (apse-sprite spr pal)
   (-apse (current-sd) (current-W) (current-H)
          (spr->make-st spr pal)))
@@ -128,6 +161,6 @@
    (-> color? color? color?
        color? color? color? color?
        (listof color?))]
-  [add-apse-palette!
+  [initialize-apse!
    (-> sprite-db?
        void?)]))
