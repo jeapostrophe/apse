@@ -1,6 +1,7 @@
 #lang racket/base
 (require racket/flonum
          racket/list
+         racket/math
          racket/fixnum
          racket/contract
          gfx/color
@@ -81,18 +82,17 @@
 (define (checkerboard csd W.0 H.0)
   (define S 8.0)
   (define sp (sprite-idx csd 'spr:point))
-  (for*/list ([c (in-range (ceiling (/ W.0 S)))]
-              [r (in-range (ceiling (/ H.0 S)))])
-    (define cx (fl+ (fl* S (fx->fl c)) (fl/ S 2.0)))
-    (define cy (fl+ (fl* S (fx->fl r)) (fl/ S 2.0)))
-    (define ?
-      (or (and (even? c) (odd? r))
-          (and (odd? c) (even? r))))
-    (if ?
-        (sprite cx cy sp #:mx S #:my S
-                #:r 226 #:g 226 #:b 226)
-        (sprite cx cy sp #:mx S #:my S
-                #:r 255 #:g 255 #:b 255))))
+  (cons (sprite (fl/ W.0 2.0) (fl/ H.0 2.0) sp
+                #:mx W.0 #:my H.0
+                #:r 255 #:g 255 #:b 255)
+        (for*/list ([c (in-range (ceiling (/ W.0 S)))]
+                    [r (in-range (ceiling (/ H.0 S)))]
+                    #:when (or (and (even? c) (odd? r))
+                               (and (odd? c) (even? r))))
+          (define cx (fl+ (fl* S (fx->fl c)) (fl/ S 2.0)))
+          (define cy (fl+ (fl* S (fx->fl r)) (fl/ S 2.0)))
+          (sprite cx cy sp #:mx S #:my S
+                  #:r 226 #:g 226 #:b 226))))
 
 ;; xxx show animations
 
@@ -137,6 +137,7 @@
     (cons cb st)))
 
 ;; xxx help make borderless tiles
+;; xxx show scenes or combinations of sprites (like tetris blocks)
 (define (apse-sprite spr pal)
   (-apse (current-sd) (current-W) (current-H)
          (spr->make-st spr pal)))
