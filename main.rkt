@@ -46,15 +46,23 @@
   (for/list ([c (in-string (symbol->string qr))])
     (hash-ref CHAR->COLOR c)))
 
+(define (show-correct-size w h)
+  (printf "~ax~a is:\n" w h)
+  (define row (string->symbol (make-string w #\_)))
+  (for ([_ (in-range (add1 h))])
+    (printf "  ~a\n" row)))
+
 (define (add-sprite!/rows sd n qrows
                           #:w w #:h h)
   (define rows (map qrow->row qrows))
   (unless (= h (length rows))
+    (show-correct-size w h)
     (error 'add-sprite!/rows "height is wrong ~v" (length rows)))
   (for ([r (in-list rows)]
         [i (in-naturals)])
     (define l (length r))
     (unless (= w l)
+      (show-correct-size w h)
       (error 'add-sprite!/rows "row ~v is wrong length ~v" i l)))
   (define pal 'pal:apse)
   (define bs (make-bytes (* 4 w h)))
