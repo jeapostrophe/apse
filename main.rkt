@@ -84,15 +84,15 @@
   (define sp (sprite-idx csd 'spr:point))
   (cons (sprite (fl/ W.0 2.0) (fl/ H.0 2.0) sp
                 #:mx W.0 #:my H.0
-                #:r 255 #:g 255 #:b 255)
-        (for*/list ([c (in-range (ceiling (/ W.0 S)))]
-                    [r (in-range (ceiling (/ H.0 S)))]
+                #:r 131 #:g 139 #:b 131)
+        (for*/list ([c (in-range (sub1 (floor (/ W.0 S))))]
+                    [r (in-range (floor (/ H.0 S)))]
                     #:when (or (and (even? c) (odd? r))
                                (and (odd? c) (even? r))))
-          (define cx (fl+ (fl* S (fx->fl c)) (fl/ S 2.0)))
+          (define cx (fl+ (fl* S (fx->fl c)) (fl* 2.0 (fl/ S 2.0))))
           (define cy (fl+ (fl* S (fx->fl r)) (fl/ S 2.0)))
           (sprite cx cy sp #:mx S #:my S
-                  #:r 226 #:g 226 #:b 226))))
+                  #:r 131 #:g 100 #:b 131))))
 
 ;; xxx show animations
 
