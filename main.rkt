@@ -108,6 +108,43 @@
 (define current-W (make-parameter #f))
 (define current-H (make-parameter #f))
 
+(define (all-sprites-st pals)
+  (λ (csd W H)
+    (define W.0 (fx->fl W))
+    (define H.0 (fx->fl H))
+
+    ;;; xxx expose csd pieces more
+    ;;; xxx add buffer between
+    ;;; xxx compute bigger scale factor
+    ;;; xxx reset back to left if we go over 
+    (local-require mode-lambda/core)
+    (define-values (st last-start-y last-end-y last-start-x)
+      (for/fold ([st #f]
+                 [start-y 0.0] [end-y 0.0]
+                 [start-x 0.0])
+                ([(spr idx) (in-hash (compiled-sprite-db-spr->idx csd))]
+                 [i (in-naturals)])
+        (define pi
+          (palette-idx csd (list-ref pals (modulo i (length pals)))))
+        (define w (sprite-width csd idx))
+        (define h (sprite-height csd idx))
+        (define cx (+ start-x (/ w 2)))
+        (define cy (+ start-y (/ h 2)))
+        (define new-start-y start-y)
+        (define new-end-y (max end-y (+ end-y h)))
+        (define new-start-x (+ start-x w))
+        (define m 1.0)
+        (values (cons (sprite cx cy idx
+                              #:mx m #:my m
+                              #:pal-idx pi)
+                      st)
+                new-start-y
+                new-end-y
+                new-start-x)))
+    
+    (define cb (checkerboard csd W.0 H.0))
+    (cons cb st)))
+
 ;; xxx show the sprite with different sizes and palette options
 (define (spr->make-st spr pal)
   (λ (csd W H)
@@ -150,6 +187,10 @@
   (-apse (current-sd) (current-W) (current-H)
          (spr->make-st spr pal)))
 
+(define (apse-all-sprites pals)
+  (-apse (current-sd) (current-W) (current-H)
+         (all-sprites-st pals)))
+
 (define-syntax-rule (with-apse-params [sd W H] . body)
   (begin
     (define apse
@@ -165,6 +206,9 @@
  (contract-out
   [apse-sprite
    (-> symbol? symbol?
+       any/c)]
+  [apse-all-sprites
+   (-> (listof symbol?)
        any/c)]
   [apse-palette
    (-> color? color? color?
