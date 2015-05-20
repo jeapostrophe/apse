@@ -99,15 +99,15 @@
   (define-sprite sd spr:point:ATint1 #:w 1 #:h 1 q)
   (define-sprite sd spr:point:ABase #:w 1 #:h 1 a)
   (define-sprite sd spr:point:AShad1 #:w 1 #:h 1 z)
-  
+
   (define-sprite sd spr:point:BTint1 #:w 1 #:h 1 w)
   (define-sprite sd spr:point:BBase #:w 1 #:h 1 s)
   (define-sprite sd spr:point:BShad1 #:w 1 #:h 1 x)
-  
+
   (define-sprite sd spr:point:CTint1 #:w 1 #:h 1 e)
   (define-sprite sd spr:point:CBase #:w 1 #:h 1 d)
   (define-sprite sd spr:point:CShad1 #:w 1 #:h 1 c)
-  
+
   (add-palette! sd 'pal:apse APSE-PALETTE))
 
 (define (checkerboard csd W.0 H.0)
@@ -251,7 +251,7 @@
     (define ds
       '([1 0 spr:point:TRANS]
         [2 0 spr:point:BLACK]
-        
+
         [3 0 spr:point:ATint1]
         [3 1 spr:point:ABase]
         [3 2 spr:point:AShad1]
@@ -272,28 +272,57 @@
         [7 0 spr:point:WHITE]))
 
     (define r 1)
+    (define base-c 0)
+
+    (define (calc-cx col)
+      (fl+ (fl* S (fx->fl col))
+           (fl* 2.0 (fl/ S 2.0))))
+    (define (calc-cy row)
+      (fl+ (fl* S (fx->fl row))
+           (fl/ S 2.0)))
+
     (define pst
       (for/list ([pal (in-list pals)]
                  [i (in-naturals)])
         (define pi (palette-idx csd pal))
-        (define c (* i cols-per-pal))
+        (define c (+ base-c (* i cols-per-pal)))
+
+        (unless (< (fl+ (calc-cx (+ cols-per-pal c))
+                        S)
+                   W.0)
+          (set! base-c (* -1 c))
+          (set! c 0)
+          (set! r (+ r 8)))
+
         (for/list ([d (in-list ds)])
           (match-define (list dr dc p) d)
-          (let loop ()
-            (define sp (sprite-idx csd p))
-            (define cx (fl+ (fl* S (fx->fl (+ dc c)))
-                            (fl* 2.0 (fl/ S 2.0))))
-            (define cy (fl+ (fl* S (fx->fl (+ dr r)))
-                            (fl/ S 2.0)))
-            (cond
-              [(< (+ cx S) W.0)
-               (sprite cx cy sp #:mx S #:my S
-                       #:pal-idx pi)]
-              [else
-               (printf "loop ~v\n" (vector cx S W.0 r))
-               (set! r (+ r 8))
-               (loop)])))))
+          (define sp (sprite-idx csd p))
+          (define cx (calc-cx (+ dc c)))
+          (define cy (calc-cy (+ dr r)))
+          (sprite cx cy sp #:mx S #:my S
+                  #:pal-idx pi))))
     (define st (list cb pst))
+    (apse-inst 0.0 (λ () st))))
+
+(define (apse-tile spr
+                   #:scale [scale 1.0]
+                   #:pal pal)
+  (λ (csd W H)
+    (define W.0 (fx->fl W))
+    (define H.0 (fx->fl H))
+    (define idx (sprite-idx csd spr))
+    (define w.0 (fl* scale (fx->fl (sprite-width csd idx))))
+    (define h.0 (fl* scale (fx->fl (sprite-height csd idx))))
+    (define pi (palette-idx csd pal))
+    (define gst
+      (for*/list ([r (in-range (inexact->exact (floor (fl/ H.0 h.0))))]
+                  [c (in-range (inexact->exact (floor (fl/ W.0 w.0))))])
+        (define cx (fl* (fl+ (fx->fl c) 0.5) w.0))
+        (define cy (fl* (fl+ (fx->fl r) 0.5) h.0))
+        (sprite cx cy idx
+                #:mx scale #:my scale
+                #:pal-idx pi)))
+    (define st (list gst))
     (apse-inst 0.0 (λ () st))))
 
 (define-syntax-rule (with-apse-params [sd W H] . body)
@@ -307,7 +336,8 @@
          apse-sprite
          apse-all-sprites
          apse-animation
-         apse-palettes)
+         apse-palettes
+         apse-tile)
 (provide
  (contract-out
   [apse-palette
