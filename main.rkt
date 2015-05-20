@@ -86,6 +86,28 @@
 
 (define (initialize-apse! sd)
   (define-sprite sd spr:point #:w 1 #:h 1 $)
+
+  (define-sprite sd spr:point:TRANS #:w 1 #:h 1 _)
+  (define-sprite sd spr:point:BLACK #:w 1 #:h 1 $)
+  (define-sprite sd spr:point:WHITE #:w 1 #:h 1 !)
+
+  (define-sprite sd spr:point:Hi1 #:w 1 #:h 1 f)
+  (define-sprite sd spr:point:Hi2 #:w 1 #:h 1 g)
+  (define-sprite sd spr:point:Hi3 #:w 1 #:h 1 h)
+  (define-sprite sd spr:point:Hi4 #:w 1 #:h 1 j)
+
+  (define-sprite sd spr:point:ATint1 #:w 1 #:h 1 q)
+  (define-sprite sd spr:point:ABase #:w 1 #:h 1 a)
+  (define-sprite sd spr:point:AShad1 #:w 1 #:h 1 z)
+  
+  (define-sprite sd spr:point:BTint1 #:w 1 #:h 1 w)
+  (define-sprite sd spr:point:BBase #:w 1 #:h 1 s)
+  (define-sprite sd spr:point:BShad1 #:w 1 #:h 1 x)
+  
+  (define-sprite sd spr:point:CTint1 #:w 1 #:h 1 e)
+  (define-sprite sd spr:point:CBase #:w 1 #:h 1 d)
+  (define-sprite sd spr:point:CShad1 #:w 1 #:h 1 c)
+  
   (add-palette! sd 'pal:apse APSE-PALETTE))
 
 (define (checkerboard csd W.0 H.0)
@@ -219,6 +241,61 @@
                  (set! i (modulo (+ 1 i) (length (animation-frames anim))))
                  (st:sprite-frame csd W H scaled-pals palette-pals spr)))))
 
+(define (apse-palettes pals)
+  (λ (csd W H)
+    (define W.0 (fx->fl W))
+    (define H.0 (fx->fl H))
+    (define cb (checkerboard csd W.0 H.0))
+    (define S 8.0)
+    (define cols-per-pal 5)
+    (define ds
+      '([1 0 spr:point:TRANS]
+        [2 0 spr:point:BLACK]
+        
+        [3 0 spr:point:ATint1]
+        [3 1 spr:point:ABase]
+        [3 2 spr:point:AShad1]
+
+        [4 0 spr:point:BTint1]
+        [4 1 spr:point:BBase]
+        [4 2 spr:point:BShad1]
+
+        [5 0 spr:point:CTint1]
+        [5 1 spr:point:CBase]
+        [5 2 spr:point:CShad1]
+
+        [6 0 spr:point:Hi1]
+        [6 1 spr:point:Hi2]
+        [6 2 spr:point:Hi3]
+        [6 3 spr:point:Hi4]
+
+        [7 0 spr:point:WHITE]))
+
+    (define r 1)
+    (define pst
+      (for/list ([pal (in-list pals)]
+                 [i (in-naturals)])
+        (define pi (palette-idx csd pal))
+        (define c (* i cols-per-pal))
+        (for/list ([d (in-list ds)])
+          (match-define (list dr dc p) d)
+          (let loop ()
+            (define sp (sprite-idx csd p))
+            (define cx (fl+ (fl* S (fx->fl (+ dc c)))
+                            (fl* 2.0 (fl/ S 2.0))))
+            (define cy (fl+ (fl* S (fx->fl (+ dr r)))
+                            (fl/ S 2.0)))
+            (cond
+              [(< (+ cx S) W.0)
+               (sprite cx cy sp #:mx S #:my S
+                       #:pal-idx pi)]
+              [else
+               (printf "loop ~v\n" (vector cx S W.0 r))
+               (set! r (+ r 8))
+               (loop)])))))
+    (define st (list cb pst))
+    (apse-inst 0.0 (λ () st))))
+
 (define-syntax-rule (with-apse-params [sd W H] . body)
   (begin
     (define apse (-apse sd W H (let () . body)))
@@ -229,7 +306,8 @@
          with-apse-params
          apse-sprite
          apse-all-sprites
-         apse-animation)
+         apse-animation
+         apse-palettes)
 (provide
  (contract-out
   [apse-palette
