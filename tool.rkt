@@ -12,13 +12,13 @@
 (struct *apse (f fe output)
   #:methods gen:word
   [(define (word-fps w)
-     0.0)
+     (apse-inst-fps (*apse-output w)))
    (define (word-label s ft)
      (lux-standard-label "APSE" ft))
    (define (word-evt w)
      (*apse-fe w))
    (define (word-output w)
-     (*apse-output w))
+     ((apse-inst-draw (*apse-output w))))
    (define (word-event w e)
      (cond
        ;; xxx follow this pattern for studio and puresuri
@@ -28,15 +28,18 @@
           (with-handlers ([exn:fail? (λ (x)
                                        ((error-display-handler) (exn-message x) x)
                                        #f)])
-            (match-define (-apse sd W H make-st) (load-visuals f))
+            (match-define (-apse sd W H make-apse-inst) (load-visuals f))
             (define csd (compile-sprite-db sd))
             (save-csd! csd "csd")
-            (define st (make-st csd W H))
             (define render (stage-draw/dc csd W H))
-            (render (vector (layer (fx->fl (/ W 2)) (fx->fl (/ H 2)))
-                            #f #f #f #f #f #f #f)
-                    st
-                    '())))
+            (define ai (make-apse-inst csd W H))
+            (struct-copy apse-inst ai
+                         [draw
+                          (λ ()
+                            (render (vector (layer (fx->fl (/ W 2)) (fx->fl (/ H 2)))
+                                            #f #f #f #f #f #f #f)
+                                    ((apse-inst-draw ai))
+                                    '()))])))
         (define new-fe
           (wrap-fe (filesystem-change-evt f)))
         (struct-copy *apse w
@@ -66,7 +69,8 @@
     (namespace-variable-value 'apse)))
 
 (define (apse! f)
-  (define obj (*apse f (wrap-fe always-evt) void))
+  (define obj (*apse f (wrap-fe always-evt)
+                     (apse-inst 0.0 (λ () void))))
   (call-with-chaos
    (make-gui #:mode gui-mode)
    (λ () (fiat-lux obj))))

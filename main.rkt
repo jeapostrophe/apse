@@ -9,6 +9,8 @@
          mode-lambda
          apse/core)
 
+(struct animation (frames))
+
 (define APSE-PALETTE
   (for/list ([i (in-range PALETTE-DEPTH)])
     (argb 255 255 0 i)))
@@ -76,7 +78,6 @@
    (λ ()
      (vector n pal w h bs))))
 
-;; xxx allow shading vs diffuse separation
 (define-syntax-rule (define-sprite sd n #:w w #:h h row ...)
   (begin
     (define n 'n)
@@ -102,114 +103,135 @@
           (sprite cx cy sp #:mx S #:my S
                   #:r 131 #:g 100 #:b 131))))
 
-;; xxx show animations
-
-(define current-sd (make-parameter #f))
-(define current-W (make-parameter #f))
-(define current-H (make-parameter #f))
-
-(define (all-sprites-st pals)
+(define (apse-all-sprites scale pals)
   (λ (csd W H)
     (define W.0 (fx->fl W))
     (define H.0 (fx->fl H))
+    (define buffer 2.0)
 
-    ;;; xxx expose csd pieces more
-    ;;; xxx add buffer between
-    ;;; xxx compute bigger scale factor
-    ;;; xxx reset back to left if we go over 
     (local-require mode-lambda/core)
+    (define (loop-body st i idx start-y end-y start-x)
+      (define pi
+        (palette-idx csd (list-ref pals (modulo i (length pals)))))
+      (define w (sprite-width csd idx))
+      (define h (sprite-height csd idx))
+      (define m scale)
+      (define cx (+ start-x (/ (* m w) 2)))
+      (define cy (+ start-y (/ (* m h) 2)))
+      (define new-start-y start-y)
+      (define new-end-y (max end-y (+ start-y (* m h))))
+      (define new-start-x (+ start-x (* m w) buffer))
+      (cond
+        [(< W.0 new-start-x)
+         (loop-body st i idx (+ buffer new-end-y) (+ buffer new-end-y) buffer)]
+        [else
+         (values (cons (sprite cx cy idx
+                               #:mx m #:my m
+                               #:pal-idx pi)
+                       st)
+                 new-start-y
+                 new-end-y
+                 new-start-x)]))
     (define-values (st last-start-y last-end-y last-start-x)
       (for/fold ([st #f]
-                 [start-y 0.0] [end-y 0.0]
-                 [start-x 0.0])
+                 [start-y buffer] [end-y buffer]
+                 [start-x buffer])
                 ([(spr idx) (in-hash (compiled-sprite-db-spr->idx csd))]
                  [i (in-naturals)])
-        (define pi
-          (palette-idx csd (list-ref pals (modulo i (length pals)))))
-        (define w (sprite-width csd idx))
-        (define h (sprite-height csd idx))
-        (define cx (+ start-x (/ w 2)))
-        (define cy (+ start-y (/ h 2)))
-        (define new-start-y start-y)
-        (define new-end-y (max end-y (+ end-y h)))
-        (define new-start-x (+ start-x w))
-        (define m 1.0)
-        (values (cons (sprite cx cy idx
-                              #:mx m #:my m
-                              #:pal-idx pi)
-                      st)
-                new-start-y
-                new-end-y
-                new-start-x)))
-    
-    (define cb (checkerboard csd W.0 H.0))
-    (cons cb st)))
+        (loop-body st i idx start-y end-y start-x)))
 
-;; xxx show the sprite with different sizes and palette options
-(define (spr->make-st spr pal)
+    (define cb (checkerboard csd W.0 H.0))
+    (apse-inst 0.0
+               (λ ()
+                 (cons cb st)))))
+
+(define (st:sprite-frame csd W H scaled-pals palette-pals spr)
+  (define W.0 (fx->fl W))
+  (define H.0 (fx->fl H))
+  (define si (sprite-idx csd spr))
+  (define w (fx->fl (sprite-width csd si)))
+  (define h (sprite-height csd si))
+
+  (define-values (left max-i)
+    (let loop ([left W.0] [i 1])
+      (define iw (fl+ 1.0 (fl* w (fx->fl i))))
+      (cond
+        [(fl< iw left)
+         (loop (fl- left iw) (fx+ 1 i))]
+        [else
+         (values left i)])))
+  (define initial-lx (fl/ left 2.0))
+
+  (define cy (fl/ (fx->fl (* max-i h)) 2.0))
+
+  (define-values (_0 scaled-seq)
+    (for/fold ([lx initial-lx] [st #f])
+              ([i (in-range 1 max-i)])
+      (define pal (list-ref scaled-pals (modulo i (length scaled-pals))))
+      (define pi (palette-idx csd pal))
+      (define m (fx->fl i))
+      (define mw (fl* m w))
+      (define cx (fl+ lx (fl/ mw 2.0)))
+      (values (fl+ 1.0 (fl+ cx (fl/ mw 2.0)))
+              (cons (sprite cx cy si
+                            #:mx m #:my m
+                            #:pal-idx pi)
+                    st))))
+
+  (define-values (_1 palette-seq)
+    (for/fold ([lx 1.0] [st #f])
+              ([pal (in-list palette-pals)]
+               [i (in-naturals)])
+      (define pi (palette-idx csd pal))
+      (define cx (fl+ lx (fl/ w 2.0)))
+      (values (fl+ 1.0 (fl+ cx (fl/ w 2.0)))
+              (cond
+                [(fl<= (fl+ cx (fl/ w 2.0)) W.0)
+                 (cons (sprite cx
+                               (fl- (fl- H.0 (fl/ (fx->fl h) 2.0)) 1.0)
+                               si
+                               #:pal-idx pi)
+                       st)]
+                [else
+                 st]))))
+
+  (define cb (checkerboard csd W.0 H.0))
+  (list cb scaled-seq palette-seq))
+
+(define (apse-sprite spr
+                     #:palettes pals)
   (λ (csd W H)
-    (define W.0 (fx->fl W))
-    (define H.0 (fx->fl H))
-    (define cy (fl/ H.0 2.0))
-    (define si (sprite-idx csd spr))
-    (define w (fx->fl (sprite-width csd si)))
-    (define h (sprite-height csd si))
-    (define pi (palette-idx csd pal))
+    (define scaled-pals (shuffle pals))
+    (define palette-pals (shuffle pals))
+    (define st (st:sprite-frame csd W H scaled-pals palette-pals spr))
+    (apse-inst 0.0 (λ () st))))
 
-    (define-values (left max-i)
-      (let loop ([left W.0] [i 1])
-        (define iw (fl+ 1.0 (fl* w (fx->fl i))))
-        (cond
-          [(fl< iw left)
-           (loop (fl- left iw) (fx+ 1 i))]
-          [else
-           (values left i)])))
-    (define initial-lx (fl/ left 2.0))
-
-    (define-values (_ st)
-      (for/fold ([lx initial-lx] [st #f])
-                ([i (in-range 1 max-i)])
-        (define m (fx->fl i))
-        (define mw (fl* m w))
-        (define cx (fl+ lx (fl/ mw 2.0)))
-        (values (fl+ 1.0 (fl+ cx (fl/ mw 2.0)))
-                (cons (sprite cx cy si
-                              #:mx m #:my m
-                              #:pal-idx pi)
-                      st))))
-
-    (define cb (checkerboard csd W.0 H.0))
-    (cons cb st)))
-
-;; xxx help make borderless tiles
-;; xxx show scenes or combinations of sprites (like tetris blocks)
-(define (apse-sprite spr pal)
-  (-apse (current-sd) (current-W) (current-H)
-         (spr->make-st spr pal)))
-
-(define (apse-all-sprites pals)
-  (-apse (current-sd) (current-W) (current-H)
-         (all-sprites-st pals)))
+(define (apse-animation anim
+                        #:fps [fps 60.0]
+                        #:palettes pals)
+  (λ (csd W H)
+    (define scaled-pals (shuffle pals))
+    (define palette-pals (shuffle pals))
+    (define i 0)
+    (apse-inst fps
+               (λ ()
+                 (define spr (list-ref (animation-frames anim) i))
+                 (set! i (modulo (+ 1 i) (length (animation-frames anim))))
+                 (st:sprite-frame csd W H scaled-pals palette-pals spr)))))
 
 (define-syntax-rule (with-apse-params [sd W H] . body)
   (begin
-    (define apse
-      (parameterize ([current-sd sd]
-                     [current-W W]
-                     [current-H H])
-        . body))
+    (define apse (-apse sd W H (let () . body)))
     (provide apse)))
 
 (provide define-sprite
-         with-apse-params)
+         (struct-out animation)
+         with-apse-params
+         apse-sprite
+         apse-all-sprites
+         apse-animation)
 (provide
  (contract-out
-  [apse-sprite
-   (-> symbol? symbol?
-       any/c)]
-  [apse-all-sprites
-   (-> (listof symbol?)
-       any/c)]
   [apse-palette
    (-> color? color? color?
        color? color? color? color?
