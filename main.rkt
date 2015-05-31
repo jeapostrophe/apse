@@ -4,9 +4,9 @@
          racket/math
          racket/fixnum
          racket/contract
-         gfx/color
          racket/match
          mode-lambda
+         mode-lambda/color
          apse/core)
 
 (struct animation (frames))
