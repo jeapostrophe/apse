@@ -114,6 +114,7 @@
   (define S 8.0)
   (define sp (sprite-idx csd 'spr:point))
   (cons (sprite (fl/ W.0 2.0) (fl/ H.0 2.0) sp
+                #:layer 0
                 #:mx W.0 #:my H.0
                 #:r 131 #:g 139 #:b 131)
         (for*/list ([c (in-range (sub1 (floor (/ W.0 S))))]
@@ -123,6 +124,7 @@
           (define cx (fl+ (fl* S (fx->fl c)) (fl* 2.0 (fl/ S 2.0))))
           (define cy (fl+ (fl* S (fx->fl r)) (fl/ S 2.0)))
           (sprite cx cy sp #:mx S #:my S
+                  #:layer 1
                   #:r 131 #:g 100 #:b 131))))
 
 (define (apse-all-sprites scale pals)
@@ -148,6 +150,7 @@
          (loop-body st i idx (+ buffer new-end-y) (+ buffer new-end-y) buffer)]
         [else
          (values (cons (sprite cx cy idx
+                               #:layer 2
                                #:mx m #:my m
                                #:pal-idx pi)
                        st)
@@ -197,6 +200,7 @@
       (values (fl+ 1.0 (fl+ cx (fl/ mw 2.0)))
               (cons (sprite cx cy si
                             #:mx m #:my m
+                            #:layer 2
                             #:pal-idx pi)
                     st))))
 
@@ -212,6 +216,7 @@
                  (cons (sprite cx
                                (fl- (fl- H.0 (fl/ (fx->fl h) 2.0)) 1.0)
                                si
+                               #:layer 2
                                #:pal-idx pi)
                        st)]
                 [else
@@ -300,6 +305,7 @@
           (define cx (calc-cx (+ dc c)))
           (define cy (calc-cy (+ dr r)))
           (sprite cx cy sp #:mx S #:my S
+                  #:layer 2
                   #:pal-idx pi))))
     (define st (list cb pst))
     (apse-inst 0.0 (λ () st))))
@@ -320,6 +326,7 @@
         (define cx (fl* (fl+ (fx->fl c) 0.5) w.0))
         (define cy (fl* (fl+ (fx->fl r) 0.5) h.0))
         (sprite cx cy idx
+                #:layer 2
                 #:mx scale #:my scale
                 #:pal-idx pi)))
     (define st (list gst))

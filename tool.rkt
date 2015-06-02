@@ -33,11 +33,12 @@
             (save-csd! csd "csd")
             (define render (stage-draw/dc csd W H))
             (define ai (make-apse-inst csd W H))
+            (define the-layer (layer (fx->fl (/ W 2)) (fx->fl (/ H 2))))
+            (define layer-config (make-vector LAYERS the-layer))
             (struct-copy apse-inst ai
                          [draw
                           (λ ()
-                            (render (vector (layer (fx->fl (/ W 2)) (fx->fl (/ H 2)))
-                                            #f #f #f #f #f #f #f)
+                            (render layer-config
                                     ((apse-inst-draw ai))
                                     '()))])))
         (define new-fe
