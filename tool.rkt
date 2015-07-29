@@ -80,6 +80,8 @@
   (require racket/cmdline)
 
   ;; (gl-screenshot-dir (build-path (current-directory) "shots"))
+  
+  (gl-filter-mode 'crt)
   (gl-filter-mode 'std)
 
   (command-line

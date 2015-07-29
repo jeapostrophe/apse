@@ -1,4 +1,6 @@
 #lang info
 (define collection "apse")
-(define deps '("mode-lambda"))
+(define deps '("base"
+               "lux"
+               "mode-lambda"))
 (define build-deps '())
