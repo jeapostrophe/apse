@@ -6,6 +6,7 @@
          racket/contract
          racket/match
          mode-lambda
+         mode-lambda/static
          mode-lambda/color
          apse/core)
 
