@@ -3,6 +3,7 @@
          racket/contract
          racket/fixnum
          mode-lambda
+         mode-lambda/static
          mode-lambda/backend/gl
          apse/core
          lux
@@ -31,7 +32,8 @@
             (match-define (-apse sd W H make-apse-inst) (load-visuals f))
             (define csd (compile-sprite-db sd))
             (save-csd! csd "csd")
-            (define render (stage-draw/dc csd W H))
+            (define LAYERS 3)
+            (define render (stage-draw/dc csd W H LAYERS))
             (define ai (make-apse-inst csd W H))
             (define the-layer (layer (fx->fl (/ W 2)) (fx->fl (/ H 2))))
             (define layer-config (make-vector LAYERS the-layer))
@@ -63,7 +65,7 @@
 (define (load-visuals mp)
   (define ns (make-base-namespace))
   (namespace-attach-module (current-namespace) 'racket/base ns)
-  (namespace-attach-module (current-namespace) 'mode-lambda ns)
+  (namespace-attach-module (current-namespace) 'mode-lambda/static ns)
   (namespace-attach-module (current-namespace) 'apse/core ns)
   (parameterize ([current-namespace ns])
     (namespace-require `(submod (file ,mp) apse))
